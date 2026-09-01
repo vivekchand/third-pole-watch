@@ -231,7 +231,10 @@
 
 </div>
 <script>
-  fetch('status.json', {cache: 'no-store'}).then(r => r.ok ? r.json() : null).then(s => {
+  const LIVE = 'https://raw.githubusercontent.com/vivekchand/third-pole-watch/data/status.json';
+  fetch(LIVE, {cache: 'no-store'})
+    .then(r => r.ok ? r.json() : fetch('status.json', {cache: 'no-store'}).then(r2 => r2.ok ? r2.json() : null))
+    .then(s => {
     if (!s || !s.candidates === undefined) return;
     const set = (id, v) => { const el = document.getElementById(id); if (el && v !== undefined && v !== null) el.textContent = v; };
     set('s-days', s.days_running);
@@ -239,7 +242,8 @@
     set('s-real', s.verified_real);
     set('s-false', s.false_alarms);
     if (s.generated_at) document.getElementById('s-updated').textContent = 'Ledger last published: ' + s.generated_at + ' UTC';
-  }).catch(() => {});
+  })
+  .catch(() => {});
 </script>
 </body>
 </html>
