@@ -20,23 +20,45 @@ from .fetch import catalog_events_near
 
 log = logging.getLogger("thirdpole.daemon")
 
-# Open SeedLink servers. GEOFON is the workhorse; Raspberry Shake adds the
-# community network (dense, noisy — used only for coincidence, v1).
+# Open SeedLink servers. GEOFON carries GE + partners; EarthScope rtserve
+# carries the global IU/II/IC networks (incl. IC.LSA Lhasa). Raspberry Shake
+# community stations are the v1 densification step.
 SEEDLINK_SERVERS = [
     "geofon.gfz-potsdam.de:18000",
-    # "rtserve.iris.washington.edu:18000",   # EarthScope real-time
-    # "rs.local... "                          # Raspberry Shake: via FDSN/SL
+    "rtserve.iris.washington.edu:18000",
 ]
 
-# Station selectors (net, sta, channel-pattern) around the Himalayan arc.
-# TASK #1 of this project is replacing this short list with a proper
-# inventory of every openly-streamed station ringing the HKH region.
-SELECTORS = [
+# Region of interest: central Himalaya, radius covering the arc.
+REGION = {"lat": 28.3, "lon": 85.0, "radius_deg": 15.0}
+
+# Fallback if the FDSN inventory is unreachable at startup. SeedLink servers
+# skip selectors they don't carry ("station not accepted"), so every server
+# gets the full list and keeps its own subset — no wildcards (the classic
+# SeedLink STATION negotiation doesn't accept them).
+FALLBACK_SELECTORS = [
     ("IC", "LSA", "BHZ"),    # Lhasa — closest open broadband to Langtang
     ("II", "NIL", "BHZ"),    # Nilore, Pakistan
     ("IU", "CHTO", "BHZ"),   # Chiang Mai
-    ("GE", "*", "BHZ"),      # any GEOFON station the server offers in-region
+    ("GE", "NPW", "BHZ"),    # Naypyidaw — delivered data for the 2026 replay
 ]
+
+
+def _regional_selectors() -> list[tuple[str, str, str]]:
+    """Resolve open broadband stations in-region from the FDSN inventory."""
+    try:
+        from .fetch import find_open_stations
+        picks = find_open_stations(REGION["lat"], REGION["lon"],
+                                   REGION["radius_deg"], max_stations=20)
+        selectors = [(p.net, p.sta, "BHZ") for p in picks]
+        if selectors:
+            log.info("resolved %d in-region stations from FDSN inventory: %s",
+                     len(selectors),
+                     ", ".join(f"{n}.{s}" for n, s, _ in selectors))
+            return selectors
+    except Exception as exc:  # noqa: BLE001
+        log.warning("FDSN station resolution failed: %s", exc)
+    log.info("using fallback selector list")
+    return FALLBACK_SELECTORS
 
 BUFFER_S = 3600 * 2          # keep 2 h per station
 SCAN_INTERVAL_S = 60
@@ -65,7 +87,12 @@ class _Buffers:
 
 class _Client(EasySeedLinkClient):
     def __init__(self, server: str, buffers: _Buffers) -> None:
-        super().__init__(server)
+        # autoconnect=False so we can set a real socket timeout first:
+        # obspy's SeedLinkConnection defaults timeout to None and then
+        # compares `elapsed < timeout` in is_connected_impl -> TypeError.
+        super().__init__(server, autoconnect=False)
+        self.conn.timeout = 30.0
+        self.connect()
         self._buffers = buffers
 
     def on_data(self, tr: Trace) -> None:  # SeedLink callback
@@ -74,20 +101,29 @@ class _Client(EasySeedLinkClient):
 
 def run() -> int:
     logging.basicConfig(level=logging.INFO,
-                        format="%(asctime)s %(name)s %(message)s")
+                        format="%(asctime)s %(name)s %(message)s",
+                        force=True)  # win over the CLI's WARNING config
     buffers = _Buffers()
+    selectors = _regional_selectors()
     threads = []
+
+    def _stream(client: _Client, server: str) -> None:
+        try:
+            client.run()
+        except Exception as exc:  # noqa: BLE001 - e.g. zero stations accepted
+            log.error("stream from %s ended: %s", server, exc)
+
     for server in SEEDLINK_SERVERS:
         try:
             client = _Client(server, buffers)
-            for net, sta, chan in SELECTORS:
+            for net, sta, chan in selectors:
                 try:
                     client.select_stream(net, sta, chan)
                 except Exception as exc:  # noqa: BLE001
                     log.warning("select %s.%s failed on %s: %s",
                                 net, sta, server, exc)
-            t = threading.Thread(target=client.run, daemon=True,
-                                 name=f"seedlink:{server}")
+            t = threading.Thread(target=_stream, args=(client, server),
+                                 daemon=True, name=f"seedlink:{server}")
             t.start()
             threads.append(t)
             log.info("streaming from %s", server)
@@ -108,8 +144,14 @@ def run() -> int:
     while True:
         time.sleep(SCAN_INTERVAL_S)
         try:
+            traces = buffers.snapshot()
+            newest = max((tr.stats.endtime.timestamp for tr in traces),
+                         default=0.0)
+            log.info("scan: %d stations buffered, newest sample %.0fs old",
+                     len(traces),
+                     time.time() - newest if newest else float("nan"))
             cands = []
-            for tr in buffers.snapshot():
+            for tr in traces:
                 cands.extend(scan_trace(tr, cfg))
             groups = coincident(cands)
             for g in groups:
