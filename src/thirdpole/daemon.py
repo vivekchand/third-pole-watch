@@ -65,7 +65,12 @@ class _Buffers:
 
 class _Client(EasySeedLinkClient):
     def __init__(self, server: str, buffers: _Buffers) -> None:
-        super().__init__(server)
+        # autoconnect=False so we can set a real socket timeout first:
+        # obspy's SeedLinkConnection defaults timeout to None and then
+        # compares `elapsed < timeout` in is_connected_impl -> TypeError.
+        super().__init__(server, autoconnect=False)
+        self.conn.timeout = 30.0
+        self.connect()
         self._buffers = buffers
 
     def on_data(self, tr: Trace) -> None:  # SeedLink callback
