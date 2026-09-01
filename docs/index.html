@@ -168,7 +168,13 @@
   </section>
 
   <section id="status">
-    <div class="chapter"><span class="num">01</span><h2>Live status — the ledger is the product</h2></div>
+    <div class="chapter"><span class="num">01</span><h2>Live from the Himalaya</h2></div>
+    <p><span id="live-badge" class="mono" style="font-size:0.78rem;font-weight:600;color:var(--stone)">● CONNECTING…</span></p>
+    <p>Ground motion, as the watch daemon hears it — the absolute envelope of the last ten minutes at each open broadband station it streams, republished continuously with the full audit trail in git.</p>
+    <div id="seismo-wrap" style="border:1px solid var(--rule);background:var(--card);padding:0.8rem 1rem;margin:1.6rem 0">
+      <canvas id="seismo" style="width:100%;height:auto;display:block" height="10" aria-label="Live seismogram envelopes per station"></canvas>
+      <p class="mono" id="seismo-note" style="font-size:0.75rem;color:var(--stone);margin:0.6rem 0 0">Waiting for the daemon's first waveform publish…</p>
+    </div>
     <p>No detector should ever feed real alerting without a measured false-alarm record. So every candidate this watch flags — true, false, or ambiguous — is logged permanently and published here, including the embarrassing ones. Trust is built in public or not at all.</p>
     <div class="stats" id="ledger-stats">
       <div class="stat"><span class="n" id="s-days">—</span><span class="l">days running</span></div>
@@ -231,8 +237,74 @@
 
 </div>
 <script>
-  fetch('status.json', {cache: 'no-store'}).then(r => r.ok ? r.json() : null).then(s => {
-    if (!s || !s.candidates === undefined) return;
+  // ---- Live seismograms: poll the data branch, draw, age in realtime.
+  const RAW = 'https://raw.githubusercontent.com/vivekchand/third-pole-watch/data/';
+  let liveData = null, liveFetchedAt = 0;
+
+  function drawSeismo() {
+    const canvas = document.getElementById('seismo');
+    const note = document.getElementById('seismo-note');
+    const badge = document.getElementById('live-badge');
+    if (!liveData || !liveData.stations || !liveData.stations.length) return;
+    const secsSinceFetch = (Date.now() - liveFetchedAt) / 1000;
+    const stations = liveData.stations;
+    const minAge = Math.min(...stations.map(s => s.age_s)) + secsSinceFetch;
+
+    const fresh = minAge < 600;
+    badge.style.color = fresh ? 'var(--good)' : 'var(--hazard)';
+    const pulse = fresh && (Math.floor(Date.now() / 700) % 2 === 0) ? '●' : '○';
+    badge.textContent = fresh
+      ? pulse + ' LIVE — ' + stations.length + ' stations · freshest sample ' + Math.round(minAge) + 's ago'
+      : '● DELAYED — freshest sample ' + Math.round(minAge / 60) + ' min ago';
+
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.clientWidth || canvas.parentElement.clientWidth - 32;
+    const rowH = 46, h = stations.length * rowH;
+    canvas.width = w * dpr; canvas.height = h * dpr;
+    canvas.style.height = h + 'px';
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, w, h);
+    const css = getComputedStyle(document.documentElement);
+    const ice = css.getPropertyValue('--ice').trim() || '#6FB0DC';
+    const stone = css.getPropertyValue('--stone').trim() || '#7E93A1';
+    const rule = css.getPropertyValue('--rule').trim() || '#223341';
+
+    stations.forEach((s, i) => {
+      const y0 = i * rowH + rowH / 2;
+      ctx.strokeStyle = rule; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(0, y0); ctx.lineTo(w, y0); ctx.stroke();
+      const n = s.env.length, amp = rowH * 0.42;
+      ctx.fillStyle = ice; ctx.globalAlpha = 0.85;
+      ctx.beginPath();
+      for (let j = 0; j < n; j++) ctx.lineTo(j / (n - 1) * w, y0 - s.env[j] * amp);
+      for (let j = n - 1; j >= 0; j--) ctx.lineTo(j / (n - 1) * w, y0 + s.env[j] * amp);
+      ctx.closePath(); ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.font = '600 11px "IBM Plex Mono", monospace';
+      ctx.fillStyle = stone;
+      ctx.fillText(s.id + ' · ' + Math.round(s.age_s + secsSinceFetch) + 's ago', 6, i * rowH + 13);
+    });
+    note.textContent = 'last ' + Math.round(liveData.window_s / 60) + ' min of ground motion · published ' +
+      liveData.generated_at + ' UTC · redraws every second, refetches every 60s';
+  }
+
+  function fetchLive() {
+    fetch(RAW + 'live.json?t=' + Date.now(), {cache: 'no-store'})
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d && d.stations) { liveData = d; liveFetchedAt = Date.now(); drawSeismo(); } })
+      .catch(() => {});
+  }
+  fetchLive();
+  setInterval(fetchLive, 60000);
+  setInterval(drawSeismo, 1000);
+  window.addEventListener('resize', drawSeismo);
+
+  // ---- Status tiles
+  fetch(RAW + 'status.json?t=' + Date.now(), {cache: 'no-store'})
+    .then(r => r.ok ? r.json() : fetch('status.json', {cache: 'no-store'}).then(r2 => r2.ok ? r2.json() : null))
+    .then(s => {
+    if (!s) return;
     const set = (id, v) => { const el = document.getElementById(id); if (el && v !== undefined && v !== null) el.textContent = v; };
     set('s-days', s.days_running);
     set('s-cands', s.candidates);

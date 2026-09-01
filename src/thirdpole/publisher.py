@@ -59,8 +59,41 @@ def _ensure_checkout() -> Path:
     return p
 
 
-def publish() -> bool:
-    """Write status.json + ledger snapshot and push. Returns True on push."""
+LIVE_WINDOW_S = 600     # waveform snapshot length
+LIVE_POINTS = 300       # envelope bins per station (2 s/bin)
+
+
+def live_payload(traces, now: float | None = None) -> dict:
+    """Downsampled absolute-envelope snapshot of the freshest traces.
+
+    Small enough to commit every publish (~a few KB), detailed enough that
+    the site can draw real seismograms — the ground actually moving.
+    """
+    import numpy as np
+    now = now or time.time()
+    stations = []
+    for tr in sorted(traces, key=lambda t: -t.stats.endtime.timestamp)[:8]:
+        sr = tr.stats.sampling_rate
+        n = int(LIVE_WINDOW_S * sr)
+        data = np.abs(np.asarray(tr.data[-n:], dtype=float))
+        if len(data) < LIVE_POINTS:
+            continue
+        bins = np.array_split(data, LIVE_POINTS)
+        env = np.array([b.max() for b in bins])
+        peak = float(env.max()) or 1.0
+        stations.append({
+            "id": f"{tr.stats.network}.{tr.stats.station}",
+            "age_s": round(now - tr.stats.endtime.timestamp),
+            "bin_s": round(LIVE_WINDOW_S / LIVE_POINTS, 1),
+            "peak": peak,
+            "env": [round(float(v) / peak, 3) for v in env],
+        })
+    return {"generated_at": time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(now)),
+            "window_s": LIVE_WINDOW_S, "stations": stations}
+
+
+def publish(traces=None) -> bool:
+    """Write status.json (+ live.json + ledger) and push. True on push."""
     if not enabled():
         return False
     try:
@@ -68,6 +101,9 @@ def publish() -> bool:
         stats = ledger.stats()
         stats["generated_at"] = time.strftime("%Y-%m-%d %H:%M", time.gmtime())
         (p / "status.json").write_text(json.dumps(stats, indent=2) + "\n")
+        if traces:
+            (p / "live.json").write_text(
+                json.dumps(live_payload(traces)) + "\n")
         if ledger.LEDGER_PATH.exists():
             shutil.copy(ledger.LEDGER_PATH, p / "ledger.jsonl")
 

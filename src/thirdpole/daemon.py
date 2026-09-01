@@ -174,10 +174,10 @@ def run() -> int:
                 alerts.send(alerts.format_alert(
                     str(when), stations, REGION_HINT,
                     mean_lp_hf, mean_dur, cat_note))
-                publisher.publish()          # candidates publish immediately
+                publisher.publish(traces)    # candidates publish immediately
                 last_publish_ts = time.time()
             if time.time() - last_publish_ts >= PUBLISH_INTERVAL_S:
-                publisher.publish()          # heartbeat for the watchdog
+                publisher.publish(traces)    # heartbeat for the watchdog
                 last_publish_ts = time.time()
         except Exception as exc:  # noqa: BLE001 - the watch must not die
             log.exception("scan cycle failed: %s", exc)
