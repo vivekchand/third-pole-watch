@@ -144,8 +144,14 @@ def run() -> int:
     while True:
         time.sleep(SCAN_INTERVAL_S)
         try:
+            traces = buffers.snapshot()
+            newest = max((tr.stats.endtime.timestamp for tr in traces),
+                         default=0.0)
+            log.info("scan: %d stations buffered, newest sample %.0fs old",
+                     len(traces),
+                     time.time() - newest if newest else float("nan"))
             cands = []
-            for tr in buffers.snapshot():
+            for tr in traces:
                 cands.extend(scan_trace(tr, cfg))
             groups = coincident(cands)
             for g in groups:
