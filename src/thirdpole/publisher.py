@@ -1,4 +1,4 @@
-"""Publish watch status + ledger to the repo's `data` branch.
+"""Publish watch status + ledger to the third-pole-watch-data repo.
 
 Git is the transport on purpose: every published status is a commit, so the
 public record of what the watch claimed, and when, is tamper-evident and
@@ -6,8 +6,8 @@ free to audit. The site reads status.json from the raw URL of this branch.
 
 Configuration (env):
   TPW_DATA_REMOTE  push URL for the repo, with credentials, e.g.
-                   https://x-access-token:<fine-grained-PAT>@github.com/vivekchand/third-pole-watch.git
-                   (PAT needs contents:read/write on this repo only)
+                   git@github.com:vivekchand/third-pole-watch-data.git
+                   (SSH deploy key with write access on the DATA repo only)
   TPW_DATA_DIR     local checkout dir (default ~/.thirdpole/data-repo)
 
 If TPW_DATA_REMOTE is unset, publishing is a silent no-op — the watch and
@@ -98,6 +98,14 @@ def publish(traces=None) -> bool:
         return False
     try:
         p = _ensure_checkout()
+        # sync before writing: tolerate external commits to the data repo
+        # (e.g. README edits) that would otherwise reject our next push
+        try:
+            _git(["fetch", "-q", "origin", BRANCH], p)
+            _git(["reset", "--hard", f"origin/{BRANCH}"], p)
+        except Exception:  # noqa: BLE001 - wedged checkout gets a fresh clone
+            shutil.rmtree(p)
+            p = _ensure_checkout()
         stats = ledger.stats()
         stats["generated_at"] = time.strftime("%Y-%m-%d %H:%M", time.gmtime())
         (p / "status.json").write_text(json.dumps(stats, indent=2) + "\n")

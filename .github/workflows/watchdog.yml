@@ -13,7 +13,7 @@ jobs:
         id: fresh
         run: |
           set -e
-          STATUS=$(curl -fsS "https://raw.githubusercontent.com/${{ github.repository }}/data/status.json" || echo "")
+          STATUS=$(curl -fsS "https://raw.githubusercontent.com/${{ github.repository }}-data/data/status.json" || echo "")
           if [ -z "$STATUS" ]; then
             echo "state=missing" >> "$GITHUB_OUTPUT"
             echo "Status file missing — daemon has never published or branch is gone."
