@@ -101,7 +101,8 @@ class _Client(EasySeedLinkClient):
 
 def run() -> int:
     logging.basicConfig(level=logging.INFO,
-                        format="%(asctime)s %(name)s %(message)s")
+                        format="%(asctime)s %(name)s %(message)s",
+                        force=True)  # win over the CLI's WARNING config
     buffers = _Buffers()
     selectors = _regional_selectors()
     threads = []
