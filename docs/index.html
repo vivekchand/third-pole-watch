@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Third Pole Watch — an open seismic watch for the Himalaya</title>
+<meta name="description" content="Detecting glacier collapses and debris flows on public seismic feeds within minutes, so mountain valleys get the warning the Trishuli never did.">
+<meta property="og:title" content="Third Pole Watch">
+<meta property="og:description" content="An open seismic watch for Himalayan mass movements. First replay result: detection 32 minutes before the real alert on 26 Aug 2026.">
+<meta property="og:image" content="https://thirdpole.watch/replay_trishuli2026.png">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏔️</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Source+Serif+4:opsz,ital,wght@8..60,0,400;8..60,0,600;8..60,1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --ground: #0B131B;
+    --ground-2: #101B25;
+    --ink: #E3EDF4;
+    --ink-soft: #B4C6D2;
+    --stone: #7E93A1;
+    --ice: #6FB0DC;
+    --ice-deep: #8CC2E8;
+    --hazard: #E07A5C;
+    --hazard-dim: #33211B;
+    --rule: #223341;
+    --card: #121E29;
+    --good: #5BAE8A;
+  }
+  * { box-sizing: border-box; }
+  html { color-scheme: dark; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "Source Serif 4", Georgia, serif;
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  img { max-width: 100%; }
+  .wrap { max-width: 72rem; margin: 0 auto; padding: 0 1.25rem 5rem; }
+  .col { max-width: 45rem; margin: 0 auto; }
+  h1, h2, h3 { font-family: "Bricolage Grotesque", "Helvetica Neue", Arial, sans-serif; text-wrap: balance; line-height: 1.1; }
+  h1 { font-size: clamp(2.8rem, 8vw, 5rem); font-weight: 800; letter-spacing: -0.02em; margin: 0.3em 0 0.25em; }
+  h2 { font-size: clamp(1.45rem, 3vw, 2rem); font-weight: 700; margin: 0 0 0.7em; letter-spacing: -0.01em; }
+  p { margin: 0 0 1.1em; }
+  a { color: var(--ice-deep); text-decoration-color: color-mix(in srgb, var(--ice) 45%, transparent); text-underline-offset: 2px; }
+  a:hover { text-decoration-color: var(--ice); }
+  a:focus-visible { outline: 2px solid var(--ice); outline-offset: 2px; border-radius: 2px; }
+  strong { font-weight: 600; }
+  .eyebrow { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ice); }
+  .mono { font-family: "IBM Plex Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+
+  header.hero { padding: 5.5rem 0 2rem; }
+  .kicker { color: var(--ink-soft); font-size: 1.16rem; max-width: 38rem; }
+  .ridge { display: block; width: 100%; height: 110px; margin-top: 2rem; }
+  .ridge polyline { fill: none; stroke: var(--rule); stroke-width: 1.5; }
+  .ridge polyline.front { stroke: var(--ice); opacity: 0.65; }
+  .ridge circle { fill: var(--ice); }
+  .ridge circle.h { fill: var(--hazard); }
+
+  .cta-row { display: flex; flex-wrap: wrap; gap: 0.8rem; margin: 1.6rem 0 0; }
+  .btn {
+    display: inline-block; font-family: "Bricolage Grotesque", sans-serif; font-weight: 700;
+    font-size: 0.95rem; padding: 0.65rem 1.2rem; border-radius: 6px; text-decoration: none;
+  }
+  .btn.primary { background: var(--ice); color: #0B131B; }
+  .btn.primary:hover { background: var(--ice-deep); }
+  .btn.ghost { border: 1px solid var(--rule); color: var(--ink); }
+  .btn.ghost:hover { border-color: var(--ice); }
+
+  section { margin: 0 0 4rem; }
+  .chapter { display: flex; align-items: baseline; gap: 0.9rem; border-top: 1px solid var(--rule); padding-top: 1.6rem; margin-bottom: 1.4rem; }
+  .chapter .num { font-family: "IBM Plex Mono", monospace; font-size: 0.85rem; font-weight: 600; color: var(--stone); }
+  .chapter h2 { margin: 0; }
+
+  .result {
+    background: var(--card); border: 1px solid var(--rule); border-left: 4px solid var(--good);
+    padding: 1.3rem 1.5rem; margin: 2.2rem 0;
+  }
+  .result .big {
+    font-family: "Bricolage Grotesque", sans-serif; font-weight: 800; letter-spacing: -0.015em;
+    font-size: clamp(1.4rem, 3.4vw, 2rem); line-height: 1.25; margin: 0 0 0.5rem;
+  }
+  .result .big em { color: var(--good); font-style: normal; }
+  .result p { color: var(--ink-soft); font-size: 0.98rem; margin: 0; }
+  .result pre {
+    background: var(--ground-2); border: 1px solid var(--rule); border-radius: 6px;
+    padding: 0.9rem 1.1rem; overflow-x: auto; font-size: 0.78rem; line-height: 1.6;
+    font-family: "IBM Plex Mono", monospace; color: var(--ink-soft); margin: 1rem 0 0;
+  }
+
+  figure { margin: 1.8rem 0; }
+  figure img { border: 1px solid var(--rule); border-radius: 6px; }
+  figcaption { font-size: 0.85rem; color: var(--stone); margin-top: 0.5rem; }
+
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1px; background: var(--rule); border: 1px solid var(--rule); margin: 1.8rem 0; }
+  .stat { background: var(--card); padding: 1rem 1.1rem; }
+  .stat .n { font-family: "Bricolage Grotesque", sans-serif; font-size: 1.8rem; font-weight: 800; letter-spacing: -0.02em; display: block; font-variant-numeric: tabular-nums; }
+  .stat .n.haz { color: var(--hazard); }
+  .stat .n.good { color: var(--good); }
+  .stat .l { font-size: 0.79rem; color: var(--stone); line-height: 1.35; display: block; margin-top: 0.15rem; font-family: "Bricolage Grotesque", sans-serif; font-weight: 500; }
+
+  .layers { display: grid; gap: 0.7rem; margin: 1.8rem 0; }
+  .layer {
+    display: grid; grid-template-columns: 9.5rem 1fr; gap: 1rem;
+    background: var(--card); border: 1px solid var(--rule); border-left: 4px solid var(--ice);
+    padding: 1rem 1.2rem;
+  }
+  .layer .lt { font-family: "Bricolage Grotesque", sans-serif; font-weight: 700; font-size: 0.95rem; line-height: 1.3; }
+  .layer .lt .hz { display: block; font-family: "IBM Plex Mono", monospace; font-weight: 500; font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--stone); margin-top: 0.3rem; }
+  .layer .lb { font-size: 0.93rem; color: var(--ink-soft); }
+  .layer .lb p { margin: 0; }
+  @media (max-width: 560px) { .layer { grid-template-columns: 1fr; gap: 0.4rem; } }
+
+  .disclaimer {
+    background: var(--hazard-dim); border-left: 4px solid var(--hazard);
+    padding: 1.15rem 1.35rem; margin: 2rem 0; font-size: 0.95rem;
+  }
+  .disclaimer p { margin: 0; }
+  .disclaimer .eyebrow { color: var(--hazard); }
+
+  ul.tight { padding-left: 1.2rem; margin: 0 0 1.2em; }
+  ul.tight li { margin-bottom: 0.55em; }
+
+  footer { border-top: 1px solid var(--rule); padding-top: 1.4rem; font-size: 0.8rem; color: var(--stone); font-family: "IBM Plex Mono", monospace; }
+  footer a { color: var(--stone); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero col">
+    <span class="eyebrow">thirdpole.watch · open source · est. Sep 2026</span>
+    <h1>Third Pole Watch</h1>
+    <p class="kicker">An open seismic watch for the world's high mountains — detecting glacier collapses, ice-rock avalanches, and debris flows on public seismic feeds within minutes, so no valley is ever again the last to know.</p>
+    <div class="cta-row">
+      <a class="btn primary" href="https://github.com/vivekchand/third-pole-watch">View on GitHub</a>
+      <a class="btn ghost" href="#status">Live status</a>
+      <a class="btn ghost" href="#involved">Get involved</a>
+    </div>
+    <svg class="ridge" viewBox="0 0 800 110" preserveAspectRatio="none" role="img" aria-label="Stylized mountain ridgeline with monitoring points">
+      <polyline points="0,95 70,60 130,80 210,28 260,55 330,40 400,12 470,48 540,30 610,68 680,45 800,90" class="front"></polyline>
+      <polyline points="0,105 90,80 180,92 290,62 380,75 480,58 590,85 700,70 800,100"></polyline>
+      <circle cx="210" cy="28" r="3.5"></circle>
+      <circle cx="400" cy="12" r="3.5" class="h"></circle>
+      <circle cx="540" cy="30" r="3.5"></circle>
+    </svg>
+  </header>
+
+  <div class="col">
+
+  <section>
+    <p>On 26 August 2026, part of a mountain near <strong>Langtang Lirung</strong> fell 1,200 metres and sent a flood down the Trishuli valley at 180&nbsp;km/h. More than a thousand people died; thousands more are missing. The collapse rang seismometers on every continent at <span class="mono">08:37</span> local time. Nepal's first alert went out at <span class="mono">09:15</span> — triggered by a phone call, not an instrument. No machine anywhere was listening.</p>
+    <p>The science for listening exists — automated seismic detection of catastrophic flows was validated on the 2021 Chamoli disaster and published in <a href="https://www.science.org/doi/10.1126/science.abj1227"><em>Science</em></a>. No operational system runs it. Third Pole Watch is the smallest thing that changes that.</p>
+
+    <div class="result">
+      <div class="big">First replay result: detection at T+349 seconds — <em>32 minutes before</em> the real alert.</div>
+      <p>Replaying the 26 Aug 2026 collapse from public waveform archives, on four open stations, with uncalibrated v0 thresholds:</p>
+      <pre>== COINCIDENT DETECTION at T+349s (3 stations: II.NIL, G.WUS, GE.NPW)
+   Actual first SMS alert: T+2280s (+38 min). Margin recovered: 32 minutes.</pre>
+    </div>
+
+    <figure>
+      <img src="replay_trishuli2026.png" alt="Seismograms from four stations showing the 26 August 2026 collapse, with the origin time and automated detector triggers marked" loading="lazy">
+      <figcaption>Vertical-component seismograms of the 2026 Trishuli collapse from open stations. Red line: collapse origin. Green dashes: automated detector triggers. Reproduce it yourself: <span class="mono">tpw replay trishuli2026</span>.</figcaption>
+    </figure>
+  </section>
+
+  <section id="status">
+    <div class="chapter"><span class="num">01</span><h2>Live status — the ledger is the product</h2></div>
+    <p>No detector should ever feed real alerting without a measured false-alarm record. So every candidate this watch flags — true, false, or ambiguous — is logged permanently and published here, including the embarrassing ones. Trust is built in public or not at all.</p>
+    <div class="stats" id="ledger-stats">
+      <div class="stat"><span class="n" id="s-days">—</span><span class="l">days running</span></div>
+      <div class="stat"><span class="n" id="s-cands">—</span><span class="l">candidates flagged</span></div>
+      <div class="stat"><span class="n good" id="s-real">—</span><span class="l">verified real</span></div>
+      <div class="stat"><span class="n haz" id="s-false">—</span><span class="l">false alarms</span></div>
+    </div>
+    <p class="mono" style="font-size:0.78rem;color:var(--stone)" id="s-updated">The live watch is in pre-launch calibration; the public ledger begins with the first continuous deployment.</p>
+  </section>
+
+  <section>
+    <div class="chapter"><span class="num">02</span><h2>How it works</h2></div>
+    <div class="layers">
+      <div class="layer">
+        <div class="lt">Listen<span class="hz">seconds → minutes</span></div>
+        <div class="lb"><p>Open real-time seismic streams (GEOFON, EarthScope, community Raspberry Shake stations) around the Himalayan arc, scanned continuously. Seismic waves cross borders regardless of politics.</p></div>
+      </div>
+      <div class="layer">
+        <div class="lt">Discriminate<span class="hz">minutes</span></div>
+        <div class="lb"><p>Mass movements radiate long-period energy with emergent onsets and long durations — unlike impulsive tectonic earthquakes. The v0 discriminator is an open, documented heuristic; calibrating it into a real classifier is the collaboration this project exists to start.</p></div>
+      </div>
+      <div class="layer">
+        <div class="lt">Log<span class="hz">forever</span></div>
+        <div class="lb"><p>Every candidate goes to an append-only public ledger with a human verdict. The long-run score is the argument for ever connecting detection to real alerting.</p></div>
+      </div>
+      <div class="layer">
+        <div class="lt">Notify<span class="hz">minutes</span></div>
+        <div class="lb"><p>Unconfirmed "check your sources" signals to subscribed humans with their own duty of care: hydropower control rooms (898 workers were underground in tunnels on 26 August), trekking operators, researchers. Official public warnings remain the role of national agencies — by design.</p></div>
+      </div>
+    </div>
+    <div class="disclaimer">
+      <span class="eyebrow">Important</span>
+      <p>Third Pole Watch is <strong>not an official warning service</strong> and must never be treated as one. Signals are unconfirmed research output. Official alerts come from national authorities — in Nepal, the Department of Hydrology and Meteorology (DHM) and NDRRMA.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="chapter"><span class="num">03</span><h2>The larger vision</h2></div>
+    <p>The seismic watch is the first organ of a four-layer system, each layer validated somewhere on Earth but never assembled where the ice is: satellite radar screening that finds unstable slopes weeks-to-months out (the precursors of Chamoli 2021 and Blatten 2025 were both visible from orbit for years) → cheap redundant ground sensors at ranked sites (the layer that let Switzerland evacuate Blatten <strong>nine days</strong> before its glacier fell — one death) → the seismic tripwire → alerts that reach every phone via cell broadcast, the technology already built into every device on Earth.</p>
+    <p>Openly, as a public good, with national agencies holding the alert authority — and with the operations funded to outlive any grant cycle, because the graveyard of Himalayan early-warning pilots is full of systems that worked until the donor left.</p>
+  </section>
+
+  <section id="involved">
+    <div class="chapter"><span class="num">04</span><h2>Get involved</h2></div>
+    <ul class="tight">
+      <li><strong>Seismologists:</strong> the v0 discriminator needs you. The replay harness (<span class="mono">tpw replay trishuli2026 | chamoli2021</span>) makes calibration a pull request.</li>
+      <li><strong>Engineers:</strong> station-inventory mapping, move-out-aware coincidence, SeedLink resilience, the InSAR screening layer — the <a href="https://github.com/vivekchand/third-pole-watch/issues">issue tracker</a> is open.</li>
+      <li><strong>Institutions</strong> (research groups, hydropower operators, mountain agencies): if minutes of unofficial early notice would change what your control room does, we want to talk.</li>
+      <li><strong>Anyone in the region:</strong> a Raspberry Shake (~$400) on your wall densifies the network.</li>
+    </ul>
+    <p>Contact: <a href="mailto:vivek@thirdpole.watch">vivek@thirdpole.watch</a> · <a href="https://github.com/vivekchand/third-pole-watch">github.com/vivekchand/third-pole-watch</a></p>
+  </section>
+
+  </div>
+
+  <footer class="col">
+    <p>Third Pole Watch · MIT licensed · built in the open after the 26 August 2026 Trishuli disaster.<br>
+    Not affiliated with any government. Official warnings: your national authority.</p>
+  </footer>
+
+</div>
+<script>
+  fetch('status.json', {cache: 'no-store'}).then(r => r.ok ? r.json() : null).then(s => {
+    if (!s || !s.candidates === undefined) return;
+    const set = (id, v) => { const el = document.getElementById(id); if (el && v !== undefined && v !== null) el.textContent = v; };
+    set('s-days', s.days_running);
+    set('s-cands', s.candidates);
+    set('s-real', s.verified_real);
+    set('s-false', s.false_alarms);
+    if (s.generated_at) document.getElementById('s-updated').textContent = 'Ledger last published: ' + s.generated_at + ' UTC';
+  }).catch(() => {});
+</script>
+</body>
+</html>

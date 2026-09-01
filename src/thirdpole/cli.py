@@ -20,7 +20,9 @@ def main(argv: list[str] | None = None) -> int:
 
     lg = sub.add_parser("ledger", help="candidate ledger")
     lgs = lg.add_subparsers(dest="lcmd", required=True)
-    lgs.add_parser("stats")
+    ls = lgs.add_parser("stats")
+    ls.add_argument("--write", metavar="PATH", default=None,
+                    help="also write stats JSON (e.g. docs/status.json for the site)")
     lgs.add_parser("list")
     lb = lgs.add_parser("label")
     lb.add_argument("index", type=int)
@@ -45,7 +47,15 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "ledger":
         from . import ledger
         if args.lcmd == "stats":
-            print(json.dumps(ledger.stats(), indent=2))
+            stats = ledger.stats()
+            print(json.dumps(stats, indent=2))
+            if args.write:
+                import time
+                from pathlib import Path
+                stats["generated_at"] = time.strftime("%Y-%m-%d %H:%M",
+                                                      time.gmtime())
+                Path(args.write).write_text(json.dumps(stats, indent=2))
+                print(f"wrote {args.write}")
         elif args.lcmd == "list":
             for i, row in enumerate(ledger.load()):
                 print(i, json.dumps(row))
