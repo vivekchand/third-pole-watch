@@ -76,6 +76,11 @@ call for a Himalayan end-to-end demonstrator.
 
 ## The ledger is the product
 
+Everything the watch publishes — heartbeats, waveforms, the candidate
+ledger — lives in the public
+[third-pole-watch-data](https://github.com/vivekchand/third-pole-watch-data)
+repository, one commit per publish: a tamper-evident audit trail.
+
 Nobody should ever wire a detector to public alerting without a measured
 false-alarm rate. Every candidate this system flags — true, false, ambiguous —
 is recorded in `~/.thirdpole/ledger.jsonl` forever. The long-running score

@@ -170,7 +170,7 @@
   <section id="status">
     <div class="chapter"><span class="num">01</span><h2>Live from the Himalaya</h2></div>
     <p><span id="live-badge" class="mono" style="font-size:0.78rem;font-weight:600;color:var(--stone)">● CONNECTING…</span></p>
-    <p>Ground motion, as the watch daemon hears it — the absolute envelope of the last ten minutes at each open broadband station it streams, republished continuously with the full audit trail in git.</p>
+    <p>Ground motion, as the watch daemon hears it — the absolute envelope of the last ten minutes at each open broadband station it streams, republished continuously with the full audit trail in the public <a href="https://github.com/vivekchand/third-pole-watch-data">data repository</a>.</p>
     <div id="seismo-wrap" style="border:1px solid var(--rule);background:var(--card);padding:0.8rem 1rem;margin:1.6rem 0">
       <canvas id="seismo" style="width:100%;height:auto;display:block" height="10" aria-label="Live seismogram envelopes per station"></canvas>
       <p class="mono" id="seismo-note" style="font-size:0.75rem;color:var(--stone);margin:0.6rem 0 0">Waiting for the daemon's first waveform publish…</p>
@@ -238,7 +238,7 @@
 </div>
 <script>
   // ---- Live seismograms: poll the data branch, draw, age in realtime.
-  const RAW = 'https://raw.githubusercontent.com/vivekchand/third-pole-watch/data/';
+  const RAW = 'https://raw.githubusercontent.com/vivekchand/third-pole-watch-data/data/';
   let liveData = null, liveFetchedAt = 0;
 
   function drawSeismo() {
