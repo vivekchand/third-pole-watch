@@ -1,0 +1,17 @@
+[Unit]
+Description=Third Pole Watch — live seismic watch daemon
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=tpw
+EnvironmentFile=/etc/thirdpole-watch.env
+ExecStart=/opt/thirdpole-watch/.venv/bin/tpw watch
+Restart=always
+RestartSec=30
+# The daemon holds only reconstructible state; kill hard if hung.
+TimeoutStopSec=20
+
+[Install]
+WantedBy=multi-user.target

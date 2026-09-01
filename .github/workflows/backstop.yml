@@ -1,0 +1,46 @@
+# Independent second detection path: archive scan of the trailing window.
+# Slow by design (cron jitter + archive latency) — it exists to catch what a
+# downed daemon missed, never to replace the live SeedLink watch.
+name: Backstop scan
+on:
+  schedule:
+    - cron: "7,37 * * * *"   # twice hourly, off the top-of-hour rush
+  workflow_dispatch:
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -e .
+      - name: Scan trailing 2 hours
+        id: scan
+        run: |
+          set +e
+          OUT=$(tpw scan --hours 2)
+          CODE=$?
+          echo "$OUT"
+          {
+            echo "result<<EOF"
+            echo "$OUT" | tail -c 3000
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+          echo "code=$CODE" >> "$GITHUB_OUTPUT"
+          # exit 1 = candidates (handled below); 2 = scan infra failure
+          [ "$CODE" -eq 2 ] && exit 1 || exit 0
+      - name: Notify on candidates
+        if: steps.scan.outputs.code == '1'
+        env:
+          TOKEN: ${{ secrets.TPW_TELEGRAM_BOT_TOKEN }}
+          CHAT: ${{ secrets.TPW_TELEGRAM_CHAT_ID }}
+        run: |
+          MSG="🟠 Third Pole Watch backstop scan flagged coincident candidate(s) in the trailing window — unconfirmed research signal, NOT an official warning. Details: ${{ steps.scan.outputs.result }}"
+          echo "$MSG"
+          if [ -n "$TOKEN" ] && [ -n "$CHAT" ]; then
+            curl -fsS -X POST "https://api.telegram.org/bot${TOKEN}/sendMessage" \
+              -d chat_id="${CHAT}" --data-urlencode text="$MSG" > /dev/null
+          fi
