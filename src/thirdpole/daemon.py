@@ -14,7 +14,7 @@ import time
 from obspy import Stream, Trace, UTCDateTime
 from obspy.clients.seedlink.easyseedlink import EasySeedLinkClient
 
-from . import alerts, ledger
+from . import alerts, ledger, publisher
 from .detector import DetectorConfig, coincident, scan_trace
 from .fetch import catalog_events_near
 
@@ -41,6 +41,7 @@ SELECTORS = [
 BUFFER_S = 3600 * 2          # keep 2 h per station
 SCAN_INTERVAL_S = 60
 ALERT_COOLDOWN_S = 1800      # don't re-alert the same window
+PUBLISH_INTERVAL_S = 300     # push status.json to the data branch
 REGION_HINT = "Himalayan arc (v0 station set — coarse localization only)"
 
 
@@ -98,6 +99,11 @@ def run() -> int:
 
     cfg = DetectorConfig()
     last_alert_ts = 0.0
+    last_publish_ts = 0.0
+    if publisher.enabled():
+        log.info("data-branch publishing enabled")
+        ledger.append({"kind": "lifecycle", "event": "watch_started"})
+        publisher.publish()
     log.info("watch running; scanning every %ss", SCAN_INTERVAL_S)
     while True:
         time.sleep(SCAN_INTERVAL_S)
@@ -126,5 +132,10 @@ def run() -> int:
                 alerts.send(alerts.format_alert(
                     str(when), stations, REGION_HINT,
                     mean_lp_hf, mean_dur, cat_note))
+                publisher.publish()          # candidates publish immediately
+                last_publish_ts = time.time()
+            if time.time() - last_publish_ts >= PUBLISH_INTERVAL_S:
+                publisher.publish()          # heartbeat for the watchdog
+                last_publish_ts = time.time()
         except Exception as exc:  # noqa: BLE001 - the watch must not die
             log.exception("scan cycle failed: %s", exc)

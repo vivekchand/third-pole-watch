@@ -18,6 +18,9 @@ def main(argv: list[str] | None = None) -> int:
 
     sub.add_parser("watch", help="run the live SeedLink watch")
 
+    sc = sub.add_parser("scan", help="backstop archive scan of the trailing window")
+    sc.add_argument("--hours", type=float, default=2.0)
+
     lg = sub.add_parser("ledger", help="candidate ledger")
     lgs = lg.add_subparsers(dest="lcmd", required=True)
     ls = lgs.add_parser("stats")
@@ -44,6 +47,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "watch":
         from . import daemon
         return daemon.run()
+    if args.cmd == "scan":
+        from . import scan
+        return scan.run(args.hours)
     if args.cmd == "ledger":
         from . import ledger
         if args.lcmd == "stats":
