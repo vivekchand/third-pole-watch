@@ -259,7 +259,7 @@
 
     const dpr = window.devicePixelRatio || 1;
     const w = canvas.clientWidth || canvas.parentElement.clientWidth - 32;
-    const rowH = 46, h = stations.length * rowH;
+    const labelH = 18, rowH = 74, h = stations.length * rowH;
     canvas.width = w * dpr; canvas.height = h * dpr;
     canvas.style.height = h + 'px';
     const ctx = canvas.getContext('2d');
@@ -267,23 +267,36 @@
     ctx.clearRect(0, 0, w, h);
     const css = getComputedStyle(document.documentElement);
     const ice = css.getPropertyValue('--ice').trim() || '#6FB0DC';
+    const ink = css.getPropertyValue('--ink-soft').trim() || '#B4C6D2';
     const stone = css.getPropertyValue('--stone').trim() || '#7E93A1';
     const rule = css.getPropertyValue('--rule').trim() || '#223341';
 
     stations.forEach((s, i) => {
-      const y0 = i * rowH + rowH / 2;
+      const top = i * rowH;
+      // label gutter above the trace — never overlaps the waveform
+      ctx.font = '600 11px "IBM Plex Mono", monospace';
+      ctx.fillStyle = ink;
+      ctx.fillText(s.id, 2, top + 12);
+      const ageTxt = Math.round(s.age_s + secsSinceFetch) + 's ago';
+      ctx.fillStyle = stone;
+      ctx.fillText(ageTxt, w - ctx.measureText(ageTxt).width - 2, top + 12);
+
+      const y0 = top + labelH + (rowH - labelH) / 2;
       ctx.strokeStyle = rule; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.moveTo(0, y0); ctx.lineTo(w, y0); ctx.stroke();
-      const n = s.env.length, amp = rowH * 0.42;
-      ctx.fillStyle = ice; ctx.globalAlpha = 0.85;
+
+      // floor-normalize so quiet noise shows structure instead of a slab
+      const lo = Math.min(...s.env), hi = Math.max(...s.env);
+      const span = (hi - lo) || 1;
+      const norm = s.env.map(v => (v - lo) / span);
+
+      const n = norm.length, amp = (rowH - labelH) * 0.44;
+      ctx.fillStyle = ice; ctx.globalAlpha = 0.8;
       ctx.beginPath();
-      for (let j = 0; j < n; j++) ctx.lineTo(j / (n - 1) * w, y0 - s.env[j] * amp);
-      for (let j = n - 1; j >= 0; j--) ctx.lineTo(j / (n - 1) * w, y0 + s.env[j] * amp);
+      for (let j = 0; j < n; j++) ctx.lineTo(j / (n - 1) * w, y0 - norm[j] * amp);
+      for (let j = n - 1; j >= 0; j--) ctx.lineTo(j / (n - 1) * w, y0 + norm[j] * amp);
       ctx.closePath(); ctx.fill();
       ctx.globalAlpha = 1;
-      ctx.font = '600 11px "IBM Plex Mono", monospace';
-      ctx.fillStyle = stone;
-      ctx.fillText(s.id + ' · ' + Math.round(s.age_s + secsSinceFetch) + 's ago', 6, i * rowH + 13);
     });
     note.textContent = 'last ' + Math.round(liveData.window_s / 60) + ' min of ground motion · published ' +
       liveData.generated_at + ' UTC · redraws every second, refetches every 60s';
