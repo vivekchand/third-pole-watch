@@ -92,7 +92,7 @@ def live_payload(traces, now: float | None = None) -> dict:
             "window_s": LIVE_WINDOW_S, "stations": stations}
 
 
-def publish(traces=None) -> bool:
+def publish(traces=None, scan=None) -> bool:
     """Write status.json (+ live.json + ledger) and push. True on push."""
     if not enabled():
         return False
@@ -110,6 +110,8 @@ def publish(traces=None) -> bool:
         stats["generated_at"] = time.strftime("%Y-%m-%d %H:%M", time.gmtime())
         # data freshness, distinct from publish freshness: a daemon that
         # heartbeats with hours-old buffers is deaf, not healthy
+        if scan:
+            stats["last_scan"] = scan
         stats["data_age_s"] = (
             round(time.time() - max(tr.stats.endtime.timestamp
                                     for tr in traces)) if traces else None)

@@ -194,6 +194,14 @@ def run() -> int:
             for tr in traces:
                 cands.extend(scan_trace(tr, cfg))
             groups = coincident(cands)
+            scan_info = {
+                "scanned_at": time.strftime("%Y-%m-%d %H:%M:%S",
+                                            time.gmtime()),
+                "stations": len(traces),
+                "station_triggers": sum(1 for c in cands if c.passed),
+                "coincident_groups": len(groups),
+                "state": "candidate" if groups else "normal",
+            }
             for g in groups:
                 det_ts = min(c.trigger_time for c in g)
                 if det_ts <= last_alert_ts + ALERT_COOLDOWN_S:
@@ -214,10 +222,10 @@ def run() -> int:
                 alerts.send(alerts.format_alert(
                     str(when), stations, REGION_HINT,
                     mean_lp_hf, mean_dur, cat_note))
-                publisher.publish(traces)    # candidates publish immediately
+                publisher.publish(traces, scan_info)  # candidates publish now
                 last_publish_ts = time.time()
             if time.time() - last_publish_ts >= PUBLISH_INTERVAL_S:
-                publisher.publish(traces)    # heartbeat for the watchdog
+                publisher.publish(traces, scan_info)  # watchdog heartbeat
                 last_publish_ts = time.time()
         except Exception as exc:  # noqa: BLE001 - the watch must not die
             log.exception("scan cycle failed: %s", exc)
