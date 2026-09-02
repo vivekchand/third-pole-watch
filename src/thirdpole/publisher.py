@@ -108,6 +108,11 @@ def publish(traces=None) -> bool:
             p = _ensure_checkout()
         stats = ledger.stats()
         stats["generated_at"] = time.strftime("%Y-%m-%d %H:%M", time.gmtime())
+        # data freshness, distinct from publish freshness: a daemon that
+        # heartbeats with hours-old buffers is deaf, not healthy
+        stats["data_age_s"] = (
+            round(time.time() - max(tr.stats.endtime.timestamp
+                                    for tr in traces)) if traces else None)
         (p / "status.json").write_text(json.dumps(stats, indent=2) + "\n")
         if traces:
             (p / "live.json").write_text(
