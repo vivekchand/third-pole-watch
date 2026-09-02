@@ -150,6 +150,24 @@
 
   <div class="col">
 
+  <section id="status">
+    <div class="chapter"><span class="num">01</span><h2>Live from the Himalaya</h2></div>
+    <p style="margin-bottom:0.4rem"><span id="live-badge" class="mono" style="font-size:0.78rem;font-weight:600;color:var(--stone)">● CONNECTING…</span><br><span id="det-state" class="mono" style="font-size:0.78rem;color:var(--stone)">detector: awaiting first verdict…</span></p>
+    <p>Ground motion, as the watch daemon hears it — the absolute envelope of the last ten minutes at each open broadband station it streams, republished continuously with the full audit trail in the public <a href="https://github.com/vivekchand/third-pole-watch-data">data repository</a>.</p>
+    <div id="seismo-wrap" style="border:1px solid var(--rule);background:var(--card);padding:0.8rem 1rem;margin:1.6rem 0">
+      <canvas id="seismo" style="width:100%;height:auto;display:block" height="10" aria-label="Live seismogram envelopes per station"></canvas>
+      <p class="mono" id="seismo-note" style="font-size:0.75rem;color:var(--stone);margin:0.6rem 0 0">Waiting for the daemon's first waveform publish…</p>
+    </div>
+    <p>No detector should ever feed real alerting without a measured false-alarm record. So every candidate this watch flags — true, false, or ambiguous — is logged permanently and published here, including the embarrassing ones. Trust is built in public or not at all.</p>
+    <div class="stats" id="ledger-stats">
+      <div class="stat"><span class="n" id="s-days">—</span><span class="l">days running</span></div>
+      <div class="stat"><span class="n" id="s-cands">—</span><span class="l">candidates flagged</span></div>
+      <div class="stat"><span class="n good" id="s-real">—</span><span class="l">verified real</span></div>
+      <div class="stat"><span class="n haz" id="s-false">—</span><span class="l">false alarms</span></div>
+    </div>
+    <p class="mono" style="font-size:0.78rem;color:var(--stone)" id="s-updated">The live watch is in pre-launch calibration; the public ledger begins with the first continuous deployment.</p>
+  </section>
+
   <section>
     <p>On 26 August 2026, part of a mountain near <strong>Langtang Lirung</strong> fell 1,200 metres and sent a flood down the Trishuli valley at 180&nbsp;km/h. More than a thousand people died; thousands more are missing. The collapse rang seismometers on every continent at <span class="mono">08:37</span> local time. Nepal's first alert went out at <span class="mono">09:15</span> — triggered by a phone call, not an instrument. No machine anywhere was listening.</p>
     <p>The science for listening exists — automated seismic detection of catastrophic flows was validated on the 2021 Chamoli disaster and published in <a href="https://www.science.org/doi/10.1126/science.abj1227"><em>Science</em></a>. No operational system runs it. Third Pole Watch is the smallest thing that changes that.</p>
@@ -167,23 +185,7 @@
     </figure>
   </section>
 
-  <section id="status">
-    <div class="chapter"><span class="num">01</span><h2>Live from the Himalaya</h2></div>
-    <p><span id="live-badge" class="mono" style="font-size:0.78rem;font-weight:600;color:var(--stone)">● CONNECTING…</span></p>
-    <p>Ground motion, as the watch daemon hears it — the absolute envelope of the last ten minutes at each open broadband station it streams, republished continuously with the full audit trail in the public <a href="https://github.com/vivekchand/third-pole-watch-data">data repository</a>.</p>
-    <div id="seismo-wrap" style="border:1px solid var(--rule);background:var(--card);padding:0.8rem 1rem;margin:1.6rem 0">
-      <canvas id="seismo" style="width:100%;height:auto;display:block" height="10" aria-label="Live seismogram envelopes per station"></canvas>
-      <p class="mono" id="seismo-note" style="font-size:0.75rem;color:var(--stone);margin:0.6rem 0 0">Waiting for the daemon's first waveform publish…</p>
-    </div>
-    <p>No detector should ever feed real alerting without a measured false-alarm record. So every candidate this watch flags — true, false, or ambiguous — is logged permanently and published here, including the embarrassing ones. Trust is built in public or not at all.</p>
-    <div class="stats" id="ledger-stats">
-      <div class="stat"><span class="n" id="s-days">—</span><span class="l">days running</span></div>
-      <div class="stat"><span class="n" id="s-cands">—</span><span class="l">candidates flagged</span></div>
-      <div class="stat"><span class="n good" id="s-real">—</span><span class="l">verified real</span></div>
-      <div class="stat"><span class="n haz" id="s-false">—</span><span class="l">false alarms</span></div>
-    </div>
-    <p class="mono" style="font-size:0.78rem;color:var(--stone)" id="s-updated">The live watch is in pre-launch calibration; the public ledger begins with the first continuous deployment.</p>
-  </section>
+
 
   <section>
     <div class="chapter"><span class="num">02</span><h2>How it works</h2></div>
@@ -313,7 +315,8 @@
   setInterval(drawSeismo, 1000);
   window.addEventListener('resize', drawSeismo);
 
-  // ---- Status tiles
+  // ---- Status tiles + detector verdict (polled like the waveforms)
+  function fetchStatus() {
   fetch(RAW + 'status.json?t=' + Date.now(), {cache: 'no-store'})
     .then(r => r.ok ? r.json() : fetch('status.json', {cache: 'no-store'}).then(r2 => r2.ok ? r2.json() : null))
     .then(s => {
@@ -324,7 +327,20 @@
     set('s-real', s.verified_real);
     set('s-false', s.false_alarms);
     if (s.generated_at) document.getElementById('s-updated').textContent = 'Ledger last published: ' + s.generated_at + ' UTC';
+    const ds = document.getElementById('det-state'), sc = s.last_scan;
+    if (ds && sc) {
+      if (sc.state === 'candidate') {
+        ds.style.color = 'var(--hazard)';
+        ds.textContent = 'detector: \u26a0 CANDIDATE FLAGGED \u2014 ' + sc.coincident_groups + ' coincident group(s), see ledger \u00b7 scan ' + sc.scanned_at + ' UTC';
+      } else {
+        ds.style.color = 'var(--good)';
+        ds.textContent = 'detector: NORMAL \u2014 ' + sc.station_triggers + ' station trigger(s), 0 coincident \u00b7 judged every 60s \u00b7 last scan ' + sc.scanned_at + ' UTC';
+      }
+    }
   }).catch(() => {});
+  }
+  fetchStatus();
+  setInterval(fetchStatus, 60000);
 </script>
 </body>
 </html>

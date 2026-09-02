@@ -64,6 +64,9 @@ BUFFER_S = 3600 * 2          # keep 2 h per station
 SCAN_INTERVAL_S = 60
 ALERT_COOLDOWN_S = 1800      # don't re-alert the same window
 PUBLISH_INTERVAL_S = 300     # push status.json to the data branch
+STALE_TRACE_S = 1800         # ignore traces with no data for 30 min
+STALE_RECONNECT_S = 600      # force-reconnect if NO station is fresher
+RESPAWN_BACKOFF_S = 120      # min seconds between reconnects per server
 REGION_HINT = "Himalayan arc (v0 station set — coarse localization only)"
 
 
@@ -80,9 +83,14 @@ class _Buffers:
             st.merge(method=1, fill_value="interpolate")
             st.trim(starttime=UTCDateTime() - BUFFER_S)
 
-    def snapshot(self) -> list[Trace]:
+    def snapshot(self, max_age_s: float | None = None) -> list[Trace]:
+        cutoff = UTCDateTime() - max_age_s if max_age_s else None
         with self._lock:
-            return [st[0].copy() for st in self._streams.values() if len(st)]
+            out = []
+            for st in self._streams.values():
+                if len(st) and (cutoff is None or st[0].stats.endtime > cutoff):
+                    out.append(st[0].copy())
+            return out
 
 
 class _Client(EasySeedLinkClient):
@@ -105,7 +113,8 @@ def run() -> int:
                         force=True)  # win over the CLI's WARNING config
     buffers = _Buffers()
     selectors = _regional_selectors()
-    threads = []
+    workers: dict[str, tuple[_Client | None, threading.Thread | None]] = {}
+    last_spawn: dict[str, float] = {}
 
     def _stream(client: _Client, server: str) -> None:
         try:
@@ -113,7 +122,20 @@ def run() -> int:
         except Exception as exc:  # noqa: BLE001 - e.g. zero stations accepted
             log.error("stream from %s ended: %s", server, exc)
 
-    for server in SEEDLINK_SERVERS:
+    def _close(server: str) -> None:
+        client, _ = workers.get(server, (None, None))
+        if client is not None:
+            try:
+                client.conn.terminate()
+                client.close()
+            except Exception:  # noqa: BLE001 - closing a dead socket
+                pass
+
+    def _spawn(server: str) -> None:
+        if time.time() - last_spawn.get(server, 0.0) < RESPAWN_BACKOFF_S:
+            return
+        last_spawn[server] = time.time()
+        _close(server)
         try:
             client = _Client(server, buffers)
             for net, sta, chan in selectors:
@@ -125,13 +147,16 @@ def run() -> int:
             t = threading.Thread(target=_stream, args=(client, server),
                                  daemon=True, name=f"seedlink:{server}")
             t.start()
-            threads.append(t)
+            workers[server] = (client, t)
             log.info("streaming from %s", server)
         except Exception as exc:  # noqa: BLE001
+            workers[server] = (None, None)
             log.error("SeedLink connect failed %s: %s", server, exc)
-    if not threads:
-        log.error("no SeedLink server reachable; exiting")
-        return 1
+
+    for server in SEEDLINK_SERVERS:
+        _spawn(server)
+    if not any(t for _, t in workers.values()):
+        log.error("no SeedLink server reachable; will keep retrying")
 
     cfg = DetectorConfig()
     last_alert_ts = 0.0
@@ -144,16 +169,39 @@ def run() -> int:
     while True:
         time.sleep(SCAN_INTERVAL_S)
         try:
-            traces = buffers.snapshot()
+            # supervise the stream threads: respawn the dead, and if EVERY
+            # station has gone quiet, assume half-open sockets (the failure
+            # observed 2 Sep 2026: threads alive, servers silent for hours)
+            # and force a full reconnect.
+            for server in SEEDLINK_SERVERS:
+                _, t = workers.get(server, (None, None))
+                if t is None or not t.is_alive():
+                    log.warning("stream thread for %s is down; reconnecting",
+                                server)
+                    _spawn(server)
+            traces = buffers.snapshot(max_age_s=STALE_TRACE_S)
             newest = max((tr.stats.endtime.timestamp for tr in traces),
                          default=0.0)
-            log.info("scan: %d stations buffered, newest sample %.0fs old",
-                     len(traces),
-                     time.time() - newest if newest else float("nan"))
+            age = time.time() - newest if newest else float("inf")
+            log.info("scan: %d fresh stations, newest sample %.0fs old",
+                     len(traces), age if age != float("inf") else -1)
+            if age > STALE_RECONNECT_S:
+                log.warning("no fresh data from ANY station for %.0fs; "
+                            "forcing reconnect of all streams", age)
+                for server in SEEDLINK_SERVERS:
+                    _spawn(server)
             cands = []
             for tr in traces:
                 cands.extend(scan_trace(tr, cfg))
             groups = coincident(cands)
+            scan_info = {
+                "scanned_at": time.strftime("%Y-%m-%d %H:%M:%S",
+                                            time.gmtime()),
+                "stations": len(traces),
+                "station_triggers": sum(1 for c in cands if c.passed),
+                "coincident_groups": len(groups),
+                "state": "candidate" if groups else "normal",
+            }
             for g in groups:
                 det_ts = min(c.trigger_time for c in g)
                 if det_ts <= last_alert_ts + ALERT_COOLDOWN_S:
@@ -174,10 +222,10 @@ def run() -> int:
                 alerts.send(alerts.format_alert(
                     str(when), stations, REGION_HINT,
                     mean_lp_hf, mean_dur, cat_note))
-                publisher.publish(traces)    # candidates publish immediately
+                publisher.publish(traces, scan_info)  # candidates publish now
                 last_publish_ts = time.time()
             if time.time() - last_publish_ts >= PUBLISH_INTERVAL_S:
-                publisher.publish(traces)    # heartbeat for the watchdog
+                publisher.publish(traces, scan_info)  # watchdog heartbeat
                 last_publish_ts = time.time()
         except Exception as exc:  # noqa: BLE001 - the watch must not die
             log.exception("scan cycle failed: %s", exc)

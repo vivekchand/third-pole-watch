@@ -24,20 +24,28 @@ jobs:
             echo "state=malformed" >> "$GITHUB_OUTPUT"; exit 0
           fi
           AGE=$(( $(date -u +%s) - $(date -u -d "$GEN" +%s) ))
-          echo "generated_at=$GEN age_seconds=$AGE"
+          DATA_AGE=$(echo "$STATUS" | jq -r '.data_age_s // empty')
+          echo "generated_at=$GEN age_seconds=$AGE data_age_s=${DATA_AGE:-unknown}"
           if [ "$AGE" -gt 1800 ]; then
             echo "state=stale" >> "$GITHUB_OUTPUT"
             echo "age=$((AGE / 60))" >> "$GITHUB_OUTPUT"
+          elif [ -n "$DATA_AGE" ] && [ "$DATA_AGE" -gt 2700 ] 2>/dev/null; then
+            # publishing fine but no seismic data: the watch is DEAF
+            echo "state=deaf" >> "$GITHUB_OUTPUT"
+            echo "age=$((DATA_AGE / 60))" >> "$GITHUB_OUTPUT"
           else
             echo "state=ok" >> "$GITHUB_OUTPUT"
           fi
-      - name: Alert if stale
-        if: steps.fresh.outputs.state == 'stale' || steps.fresh.outputs.state == 'malformed'
+      - name: Alert if stale or deaf
+        if: contains(fromJSON('["stale", "deaf", "malformed"]'), steps.fresh.outputs.state)
         env:
           TOKEN: ${{ secrets.TPW_TELEGRAM_BOT_TOKEN }}
           CHAT: ${{ secrets.TPW_TELEGRAM_CHAT_ID }}
         run: |
-          MSG="🔴 Third Pole Watch OFFLINE: status.json is ${{ steps.fresh.outputs.state }} (last publish ${{ steps.fresh.outputs.age }} min ago). The live watch daemon needs attention."
+          case "${{ steps.fresh.outputs.state }}" in
+            deaf) MSG="🟠 Third Pole Watch is DEAF: publishing heartbeats but freshest seismic sample is ${{ steps.fresh.outputs.age }} min old — streams are down." ;;
+            *)    MSG="🔴 Third Pole Watch OFFLINE: status.json is ${{ steps.fresh.outputs.state }} (last publish ${{ steps.fresh.outputs.age }} min ago). The daemon needs attention." ;;
+          esac
           echo "$MSG"
           if [ -n "$TOKEN" ] && [ -n "$CHAT" ]; then
             curl -fsS -X POST "https://api.telegram.org/bot${TOKEN}/sendMessage" \
